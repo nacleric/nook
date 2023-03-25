@@ -1,0 +1,20 @@
+{
+    "2gb": [
+        {
+			"store": "vilros",
+			"link":  "https://vilros.com/products/raspberry-pi-4-2gb-ram?src=raspberrypi",
+			"ram":   2,
+            "misc": "https://vilros.com/products/raspberry-pi-4-2gb-ram.js"
+		},
+		{
+			"store": "adafruit",
+			"link":  "https://www.adafruit.com/product/4295?src=raspberrypi",
+			"ram":   2
+		},
+		{
+			"store": "pishop.us",
+			"link":  "https://www.pishop.us/product/raspberry-pi-4-model-b-2gb/?src=raspberrypi",
+			"ram":   2
+		}
+    ]
+}
