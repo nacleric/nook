@@ -18,30 +18,30 @@ type Item struct {
 	Store string `json:"store"`
 	Link  string `json:"link"`
 	Ram   int    `json:"ram"`
+	Misc  string `json:"misc"`
 }
 
-// testing out the json library
 func readJsonFile() PiItemsJson {
 	content, err := os.ReadFile("./store.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-    var data PiItemsJson
+	var data PiItemsJson
 
 	if err := json.Unmarshal(content, &data); err != nil {
 		log.Fatalln(err)
 	}
 
-    return data
+	return data
 }
 
-func getStoreHtmlBody(Link string) string {
-	resp, err := http.Get(Link)
+func getStoreHtmlBody(link string) string {
+	resp, err := http.Get(link)
 	if err != nil {
 		log.Fatalln(err)
 	}
-    
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalln(err)
@@ -51,7 +51,15 @@ func getStoreHtmlBody(Link string) string {
 	return html
 }
 
-func testLoop(pi PiItemsJson) {
+func isVilrosAvailable(i Item) {
+	resp, err := http.Get(i.Misc)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Println(resp.Body)
+}
+
+func testLoop(stores PiItemsJson) {
 	// chicacgo electonic distributors
 	// adafruit
 	// pishop.us
@@ -61,15 +69,15 @@ func testLoop(pi PiItemsJson) {
 	// microcenter
 
 	for {
-		for _, value := range pi.TwoGb {
-			if value.Store == "adafruit" {
-				// html := getStoreHtmlBody(value.Link)
+		for _, item := range stores.TwoGb {
+			if item.Store == "adafruit" {
+				// html := getStoreHtmlBody(item.Link)
 				// log.Printf(html)
-				fmt.Println(value.Store)
-			} else if value.Store == "vilros" {
-				fmt.Println(value.Store)
-			} else if value.Store == "pishop.us" {
-				fmt.Println(value.Store)
+				fmt.Println(item.Store)
+			} else if item.Store == "vilros" {
+				isVilrosAvailable(item)
+			} else if item.Store == "pishop.us" {
+				fmt.Println(item.Store)
 			}
 		}
 
@@ -79,5 +87,5 @@ func testLoop(pi PiItemsJson) {
 
 func main() {
 	data := readJsonFile()
-    testLoop(data)
+	testLoop(data)
 }
