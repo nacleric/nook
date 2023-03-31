@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +15,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type PiItemsJson struct {
+type ItemsJson struct {
 	TwoGb []Item `json:"2gb"`
 }
 
@@ -25,13 +26,13 @@ type Item struct {
 	Misc  string `json:"misc"`
 }
 
-func readJsonFile() PiItemsJson {
+func readJsonFile() ItemsJson {
 	content, err := os.ReadFile("./store.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	var data PiItemsJson
+	var data ItemsJson
 
 	if err := json.Unmarshal(content, &data); err != nil {
 		log.Fatalln(err)
@@ -55,7 +56,7 @@ func getStoreHtmlBody(link string) string {
 	return html
 }
 
-func isVilrosAvailable(i Item) bool {
+func isVilrosAvailable(i Item) (bool, error) {
 	resp, err := http.Get(i.Misc)
 	if err != nil {
 		log.Fatalln(err)
@@ -66,48 +67,36 @@ func isVilrosAvailable(i Item) bool {
 		log.Fatalln(err)
 	}
 
-	var result map[string]interface{}
-	json.Unmarshal([]byte(body), &result)
+	var jsonMapping map[string]interface{}
+	json.Unmarshal([]byte(body), &jsonMapping)
 
-	if result["available"] == true {
-		return true
-	} else {
-		return false
+	isAvailable, ok := jsonMapping["available"].(bool)
+	if !ok {
+		return false, errors.New("Json mapping for Vilros did not return boolean value")
 	}
+	return isAvailable, nil
 }
 
-func testLoop(stores PiItemsJson) {
-	// chicacgo electonic distributors
-	// adafruit
-	// pishop.us
-	// sparkfun
-	// vilros
-	// canakit
-	// microcenter
-
+func pollStores(stores ItemsJson) {
 	for {
 		for _, item := range stores.TwoGb {
-			if item.Store == "adafruit" {
-				// html := getStoreHtmlBody(item.Link)
-				// log.Printf(html)
-				fmt.Println(item.Store)
-			} else if item.Store == "vilros" {
-				isVilrosAvailable(item)
-			} else if item.Store == "pishop.us" {
-				fmt.Println(item.Store)
-			}
+            switch item.Store {
+                case "adafruit":
+                    fmt.Println(item.Store)
+                case "pishop.us":
+                    fmt.Println(item.Store)
+                case "vilros":
+                    // isVilrosAvailable(item)
+                    fmt.Println(item.Store)
+            }
 		}
 
-		time.Sleep(60 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
-func main() {
-
-	// data := readJsonFile()
-	// testLoop(data)
-
-	token := "NjYzMTcwNTIyMDc4NTExMTA0.GEfq7G._azpPjUB_fajKlZi6VDgK7r7_pvRF3mrwdNj88"
+func initBot() {
+    token := "NjYzMTcwNTIyMDc4NTExMTA0.GEfq7G._azpPjUB_fajKlZi6VDgK7r7_pvRF3mrwdNj88"
 
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -115,7 +104,7 @@ func main() {
 		return
 	}
 
-	dg.AddHandler(messageCreate)
+	dg.AddHandler(pingMe)
 
 	// Receiving message events.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
@@ -136,19 +125,19 @@ func main() {
 	dg.Close()
 }
 
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func main() {
+    data := readJsonFile()
+	go pollStores(data)
+    initBot()
+}
+
+func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore all messages created by the bot itself
-	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-	// If the message is "ping" reply with "Pong!"
+    
 	if m.Content == "ping" {
 		s.ChannelMessageSend(m.ChannelID, "Pong!")
-	}
-
-	// If the message is "pong" reply with "Ping!"
-	if m.Content == "pong" {
-		s.ChannelMessageSend(m.ChannelID, "Ping!")
 	}
 }

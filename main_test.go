@@ -15,7 +15,7 @@ func TestIsVilrosAvailable__yields_false_if_product_unavailable(t *testing.T) {
 	expected_res := false
 
 	// When
-	sut := isVilrosAvailable(item)
+	sut, _ := isVilrosAvailable(item)
 	res := sut
 
 	// Then
