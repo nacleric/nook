@@ -23,3 +23,22 @@ func TestIsVilrosAvailable__yields_false_if_product_unavailable(t *testing.T) {
 		t.Errorf("left == %v, right == %v", res, expected_res)
 	}
 }
+
+func TestIsAdaFruitAvailable__yields_false_if_product_unavailable(t *testing.T) {
+	// Given
+	item := Item{
+		Store: "adafruit",
+		Link:  "https://www.adafruit.com/product/4292",
+		Ram:   2,
+	}
+	expected_res := false
+
+	// When
+	sut, _ := isAdaFruitAvailable(item)
+	res := sut
+
+	// Then
+	if res != expected_res {
+		t.Errorf("left == %v, right == %v", res, expected_res)
+	}
+}

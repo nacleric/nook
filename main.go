@@ -9,8 +9,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -41,7 +44,7 @@ func readJsonFile() ItemsJson {
 	return data
 }
 
-func getStoreHtmlBody(link string) string {
+func getStoreResponseBody(link string) string {
 	resp, err := http.Get(link)
 	if err != nil {
 		log.Fatalln(err)
@@ -72,23 +75,53 @@ func isVilrosAvailable(i Item) (bool, error) {
 
 	isAvailable, ok := jsonMapping["available"].(bool)
 	if !ok {
-		return false, errors.New("Json mapping for Vilros did not return boolean value")
+		return false, errors.New("json mapping for Vilros did not return boolean value")
 	}
 	return isAvailable, nil
+}
+
+func isAdaFruitAvailable(i Item) (bool, error) {
+	var isAvailable bool = true
+
+	res_body := getStoreResponseBody(i.Link)
+	doc, err := html.Parse(strings.NewReader(res_body))
+
+	// https://go.dev/play/p/sJqlctpSGQA
+	// Traversing dom-tree recursively
+	// Looking for <div itemprop="availability" class="oos-header">Out of stock</div>
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "div" {
+			for _, a := range n.Attr {
+				if a.Val == "availability" {
+					if strings.ToLower(n.FirstChild.Data) == "out of stock" {
+						isAvailable = false
+						break
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+	return isAvailable, err
 }
 
 func pollStores(stores ItemsJson) {
 	for {
 		for _, item := range stores.TwoGb {
-            switch item.Store {
-                case "adafruit":
-                    fmt.Println(item.Store)
-                case "pishop.us":
-                    fmt.Println(item.Store)
-                case "vilros":
-                    // isVilrosAvailable(item)
-                    fmt.Println(item.Store)
-            }
+			switch item.Store {
+			case "adafruit":
+				// isAdaFruitAvailable(item)
+				fmt.Println(item.Store)
+			case "pishop.us":
+				fmt.Println(item.Store)
+			case "vilros":
+				// isVilrosAvailable(item)
+				fmt.Println(item.Store)
+			}
 		}
 
 		time.Sleep(5 * time.Second)
@@ -96,7 +129,7 @@ func pollStores(stores ItemsJson) {
 }
 
 func initBot() {
-    token := "NjYzMTcwNTIyMDc4NTExMTA0.GEfq7G._azpPjUB_fajKlZi6VDgK7r7_pvRF3mrwdNj88"
+	token := "NjYzMTcwNTIyMDc4NTExMTA0.GEfq7G._azpPjUB_fajKlZi6VDgK7r7_pvRF3mrwdNj88"
 
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -126,9 +159,9 @@ func initBot() {
 }
 
 func main() {
-    data := readJsonFile()
+	data := readJsonFile()
 	go pollStores(data)
-    initBot()
+	initBot()
 }
 
 func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -136,7 +169,7 @@ func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-    
+
 	if m.Content == "ping" {
 		s.ChannelMessageSend(m.ChannelID, "Pong!")
 	}
