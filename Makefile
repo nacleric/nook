@@ -1,9 +1,9 @@
 .PHONY: run
-run: main
+run: mymain
 	./$<
 
-main: *.go go.mod
+mymain: *.go go.mod
 	go build -o $@ .
 
 .PHONY: all
-all: main
+all: mymain
