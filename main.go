@@ -87,7 +87,6 @@ func isAdaFruitAvailable(i Item) (bool, error) {
 	doc, err := html.Parse(strings.NewReader(res_body))
 
 	// https://go.dev/play/p/sJqlctpSGQA
-	// Traversing dom-tree recursively
 	// Looking for <div itemprop="availability" class="oos-header">Out of stock</div>
 	var f func(*html.Node)
 	f = func(n *html.Node) {
@@ -109,6 +108,31 @@ func isAdaFruitAvailable(i Item) (bool, error) {
 	return isAvailable, err
 }
 
+func isPiShopAvailable(i Item) (bool, error) {
+	var isAvailable bool = true
+
+	res_body := getStoreResponseBody(i.Link)
+	doc, err := html.Parse(strings.NewReader(res_body))
+
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "input" {
+			for _, a := range n.Attr {
+				if strings.ToLower(a.Val) == "out of stock" {
+					isAvailable = false
+					break
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+
+	return isAvailable, err
+}
+
 func pollStores(stores ItemsJson, dg *discordgo.Session) {
 	for {
 		for _, item := range stores.TwoGb {
@@ -123,7 +147,14 @@ func pollStores(stores ItemsJson, dg *discordgo.Session) {
 					notifyEric(dg, item.Link)
 				}
 			case "pishop.us":
-				fmt.Println(item.Store)
+				isAvailable, err := isPiShopAvailable(item)
+				if err != nil {
+					fmt.Println("adafruit error:", err)
+				}
+
+				if isAvailable {
+					notifyEric(dg, item.Link)
+				}
 			case "vilros":
 				isAvailable, err := isVilrosAvailable(item)
 				if err != nil {
@@ -176,9 +207,9 @@ func discordServerListener(dg *discordgo.Session) {
 }
 
 func main() {
-	data := readJsonFile()
+	stores := readJsonFile()
 	dg := initBot()
-	go pollStores(data, dg)
+	go pollStores(stores, dg)
 	initBotCommands(dg)
 	discordServerListener(dg)
 }
