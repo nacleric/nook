@@ -1,5 +1,3 @@
-RasperryPi's always sold out, they made me do this
-
 # List of Stores
 
 chicacgo electonic distributors

@@ -109,41 +109,59 @@ func isAdaFruitAvailable(i Item) (bool, error) {
 	return isAvailable, err
 }
 
-func pollStores(stores ItemsJson) {
+func pollStores(stores ItemsJson, dg *discordgo.Session) {
 	for {
 		for _, item := range stores.TwoGb {
 			switch item.Store {
 			case "adafruit":
-				// isAdaFruitAvailable(item)
-				fmt.Println(item.Store)
+				isAvailable, err := isAdaFruitAvailable(item)
+				if err != nil {
+					fmt.Println("adafruit error:", err)
+				}
+
+				if isAvailable {
+					notifyEric(dg, item.Link)
+				}
 			case "pishop.us":
 				fmt.Println(item.Store)
 			case "vilros":
-				// isVilrosAvailable(item)
-				fmt.Println(item.Store)
+				isAvailable, err := isVilrosAvailable(item)
+				if err != nil {
+					fmt.Println("vilros error", err)
+				}
+
+				if isAvailable {
+					notifyEric(dg, item.Link)
+				}
 			}
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(60 * time.Second)
 	}
 }
 
-func initBot() {
+func initBot() *discordgo.Session {
 	token := "NjYzMTcwNTIyMDc4NTExMTA0.GEfq7G._azpPjUB_fajKlZi6VDgK7r7_pvRF3mrwdNj88"
 
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
-		return
 	}
 
-	dg.AddHandler(pingMe)
+	return dg
+}
 
+func initBotCommands(dg *discordgo.Session) {
+	dg.AddHandler(pingMe)
+	dg.AddHandler(dmUser)
+}
+
+func discordServerListener(dg *discordgo.Session) {
 	// Receiving message events.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
 	// Open a websocket connection to Discord and begin listening.
-	err = dg.Open()
+	err := dg.Open()
 	if err != nil {
 		fmt.Println("error opening connection,", err)
 		return
@@ -154,16 +172,33 @@ func initBot() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	// Cleanly close down the Discord session.
 	dg.Close()
 }
 
 func main() {
 	data := readJsonFile()
-	go pollStores(data)
-	initBot()
+	dg := initBot()
+	go pollStores(data, dg)
+	initBotCommands(dg)
+	discordServerListener(dg)
 }
 
+func notifyEric(s *discordgo.Session, msg string) {
+	userId := "115272309870297090"
+	channelId := "1090462882317221960"
+	_, err := s.UserChannelCreate(userId)
+	if err != nil {
+		fmt.Println("error creating channel:", err)
+		return
+	}
+
+	_, err = s.ChannelMessageSend(channelId, msg)
+	if err != nil {
+		fmt.Println("error sending DM message:", err)
+	}
+}
+
+// Example code
 func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore all messages created by the bot itself
 	if m.Author.ID == s.State.User.ID {
@@ -172,5 +207,44 @@ func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if m.Content == "ping" {
 		s.ChannelMessageSend(m.ChannelID, "Pong!")
+	}
+}
+
+// Example code
+func dmUser(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// Ignore all messages created by the bot itself
+	if m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	if m.Content != "ping" {
+		return
+	}
+
+	channel, err := s.UserChannelCreate(m.Author.ID)
+	if err != nil {
+		// Failed to create channel error
+		// Possible reasons
+		// 1. We don't share a server with the user
+		// 2. Ratelimit
+		fmt.Println("error creating channel:", err)
+		s.ChannelMessageSend(
+			m.ChannelID,
+			"Something went wrong while sending the DM!",
+		)
+		return
+	}
+
+	_, err = s.ChannelMessageSend(channel.ID, "Pong!")
+	if err != nil {
+		// Failed to send messages
+		// Possible reasons
+		// 1. User may have disabled DM's
+		fmt.Println("error sending DM message:", err)
+		s.ChannelMessageSend(
+			m.ChannelID,
+			"Failed to send you a DM. "+
+				"Did you disable DM in your privacy settings?",
+		)
 	}
 }

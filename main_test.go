@@ -42,3 +42,13 @@ func TestIsAdaFruitAvailable__yields_false_if_product_unavailable(t *testing.T) 
 		t.Errorf("left == %v, right == %v", res, expected_res)
 	}
 }
+
+func TestNotifyEric(t *testing.T) {
+	// Given
+	dg := initBot()
+
+	// When
+	// Then
+	notifyEric(dg, "Test NotifyEric() passed")
+	dg.Close()
+}
