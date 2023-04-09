@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -32,13 +34,13 @@ type Item struct {
 func readJsonFile() ItemsJson {
 	content, err := os.ReadFile("./store.json")
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	var data ItemsJson
 
 	if err := json.Unmarshal(content, &data); err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	return data
@@ -47,12 +49,12 @@ func readJsonFile() ItemsJson {
 func getStoreResponseBody(link string) string {
 	resp, err := http.Get(link)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	html := string(body)
@@ -62,12 +64,12 @@ func getStoreResponseBody(link string) string {
 func isVilrosAvailable(i Item) (bool, error) {
 	resp, err := http.Get(i.Misc)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	var jsonMapping map[string]interface{}
@@ -136,34 +138,28 @@ func isPiShopAvailable(i Item) (bool, error) {
 func pollStores(stores ItemsJson, dg *discordgo.Session) {
 	for {
 		for _, item := range stores.TwoGb {
+			var isAvailable bool
+			var err error
 			switch item.Store {
 			case "adafruit":
-				isAvailable, err := isAdaFruitAvailable(item)
+				isAvailable, err = isAdaFruitAvailable(item)
 				if err != nil {
 					fmt.Println("adafruit error:", err)
-				}
-
-				if isAvailable {
-					notifyEric(dg, item.Link)
 				}
 			case "pishop.us":
-				isAvailable, err := isPiShopAvailable(item)
+				isAvailable, err = isPiShopAvailable(item)
 				if err != nil {
-					fmt.Println("adafruit error:", err)
-				}
-
-				if isAvailable {
-					notifyEric(dg, item.Link)
+					fmt.Println("pishop.us error:", err)
 				}
 			case "vilros":
-				isAvailable, err := isVilrosAvailable(item)
+				isAvailable, err = isVilrosAvailable(item)
 				if err != nil {
 					fmt.Println("vilros error", err)
 				}
+			}
 
-				if isAvailable {
-					notifyEric(dg, item.Link)
-				}
+			if isAvailable {
+				notifyEric(dg, item.Link)
 			}
 		}
 
@@ -184,7 +180,8 @@ func initBot() *discordgo.Session {
 
 func initBotCommands(dg *discordgo.Session) {
 	dg.AddHandler(pingMe)
-	dg.AddHandler(dmUser)
+	dg.AddHandler(youtubePlay)
+	dg.AddHandler(shellCmdFooTest)
 }
 
 func discordServerListener(dg *discordgo.Session) {
@@ -236,46 +233,59 @@ func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	if m.Content == "ping" {
+	if m.Content == "$ping" {
 		s.ChannelMessageSend(m.ChannelID, "Pong!")
 	}
 }
 
-// Example code
-func dmUser(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore all messages created by the bot itself
+func youtubePlay(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
 
-	if m.Content != "ping" {
+	removeExtraWhitespace := regexp.MustCompile(`\s+`).ReplaceAllString(m.Content, " ")
+	params := strings.Split(removeExtraWhitespace, " ")
+
+	if len(params) > 2 {
+		s.ChannelMessageSend(m.ChannelID, "Too many arguments")
 		return
 	}
 
-	channel, err := s.UserChannelCreate(m.Author.ID)
-	if err != nil {
-		// Failed to create channel error
-		// Possible reasons
-		// 1. We don't share a server with the user
-		// 2. Ratelimit
-		fmt.Println("error creating channel:", err)
-		s.ChannelMessageSend(
-			m.ChannelID,
-			"Something went wrong while sending the DM!",
-		)
+	if len(params) == 2 {
+		if params[0] == "$play" {
+			// TODO check if it's a valid youtube link
+			_, err := url.ParseRequestURI(params[1])
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Not a valid URL")
+				return
+			}
+			v, err := s.ChannelVoiceJoin(m.GuildID, m.ChannelID, false, false)
+			if err != nil {
+				fmt.Println("Unable to join voice channel:", err)
+				return
+			}
+			v.Speaking(true)
+			v.Close()
+			v.Disconnect()
+
+		}
+	}
+}
+
+func shellCmdFooTest(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
 		return
 	}
 
-	_, err = s.ChannelMessageSend(channel.ID, "Pong!")
+	if m.Content == "$test" {
+		downloadMusic("https://www.youtube.com/watch?v=n8zk0vdvzrc")
+	}
+}
+
+func downloadMusic(ytlink string) {
+	cmd := exec.Command("yt-dlp", "-x", "--audio-format=mp3", ytlink)
+	_, err := cmd.Output()
 	if err != nil {
-		// Failed to send messages
-		// Possible reasons
-		// 1. User may have disabled DM's
-		fmt.Println("error sending DM message:", err)
-		s.ChannelMessageSend(
-			m.ChannelID,
-			"Failed to send you a DM. "+
-				"Did you disable DM in your privacy settings?",
-		)
+		fmt.Println("could not run command: ", err)
 	}
 }
