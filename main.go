@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,6 +16,7 @@ import (
 
 	"golang.org/x/net/html"
 
+	"github.com/bwmarrin/dgvoice"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -254,17 +254,19 @@ func youtubePlay(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if len(params) == 2 {
 		if params[0] == "$play" {
 			// TODO check if it's a valid youtube link
-			_, err := url.ParseRequestURI(params[1])
-			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, "Not a valid URL")
-				return
-			}
-			v, err := s.ChannelVoiceJoin(m.GuildID, m.ChannelID, false, false)
+			// _, err := url.ParseRequestURI(params[1])
+			// if err != nil {
+			// 	s.ChannelMessageSend(m.ChannelID, "Not a valid URL")
+			// 	return
+			// }
+			v, err := s.ChannelVoiceJoin(m.GuildID, "415781326847737861", false, false)
 			if err != nil {
 				fmt.Println("Unable to join voice channel:", err)
 				return
 			}
 			v.Speaking(true)
+			// dgvoice.PlayAudioFile(dgv, fmt.Sprintf("%s/%s", *Folder, f.Name()), make(chan bool))
+			dgvoice.PlayAudioFile(v, "カオスが極まる - UNISON SQUARE GARDEN ⧸⧸ covered by 松永依織 [n8zk0vdvzrc].mp3", make(chan bool))
 			v.Close()
 			v.Disconnect()
 
