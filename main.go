@@ -271,6 +271,8 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 				s.ChannelMessageSend(m.ChannelID, "Trouble downloading Music")
 				return
 			}
+
+			// TODO: Upload Music, if multiple songs zip and send
 		}
 	}
 }
