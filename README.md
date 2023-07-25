@@ -1,8 +1,18 @@
 ex: yt-dlp -x --audio-format=mp3 https://www.youtube.com/watch?v=n8zk0vdvzrc
 
 sudo apt install python3.11
-sudo apt install yt-dlp
+sudo apt install python3-pip
+pip install yt-dlp
 sudo apt install ffmpeg
+
+
+Need discord api token
+> export TOKEN=asdasdasd
+
+Used for DM'ing owner of BOT
+> export USERID=asdasdasd
+
+> export CHANNELID=asdasdasd
 
 
 # List of Stores

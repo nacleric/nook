@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/net/html"
 
 	"github.com/bwmarrin/discordgo"
@@ -159,7 +161,7 @@ func pollStores(stores ItemsJson, dg *discordgo.Session) {
 			}
 
 			if isAvailable {
-				notifyEric(dg, item.Link)
+				notifyOwner(dg, item.Link)
 			}
 		}
 
@@ -168,8 +170,7 @@ func pollStores(stores ItemsJson, dg *discordgo.Session) {
 }
 
 func initBot() *discordgo.Session {
-	token := "NjYzMTcwNTIyMDc4NTExMTA0.GEfq7G._azpPjUB_fajKlZi6VDgK7r7_pvRF3mrwdNj88"
-
+	token := os.Getenv("TOKEN")
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
@@ -180,8 +181,7 @@ func initBot() *discordgo.Session {
 
 func initBotCommands(dg *discordgo.Session) {
 	dg.AddHandler(pingMe)
-	dg.AddHandler(youtubePlay)
-	dg.AddHandler(shellCmdFooTest)
+	dg.AddHandler(youtubeDownloadMp3)
 }
 
 func discordServerListener(dg *discordgo.Session) {
@@ -204,16 +204,16 @@ func discordServerListener(dg *discordgo.Session) {
 }
 
 func main() {
-	stores := readJsonFile()
+	// stores := readJsonFile()
 	dg := initBot()
-	go pollStores(stores, dg)
+	// go pollStores(stores, dg)
 	initBotCommands(dg)
 	discordServerListener(dg)
 }
 
-func notifyEric(s *discordgo.Session, msg string) {
-	userId := "115272309870297090"
-	channelId := "1090462882317221960"
+func notifyOwner(s *discordgo.Session, msg string) {
+	userId := os.Getenv("USERID")
+	channelId := os.Getenv("CHANNELID")
 	_, err := s.UserChannelCreate(userId)
 	if err != nil {
 		fmt.Println("error creating channel:", err)
@@ -238,11 +238,10 @@ func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func youtubePlay(s *discordgo.Session, m *discordgo.MessageCreate) {
+func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-
 	removeExtraWhitespace := regexp.MustCompile(`\s+`).ReplaceAllString(m.Content, " ")
 	params := strings.Split(removeExtraWhitespace, " ")
 
@@ -252,40 +251,34 @@ func youtubePlay(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if len(params) == 2 {
-		if params[0] == "$play" {
+		if params[0] == "$dl" {
 			// TODO check if it's a valid youtube link
 			_, err := url.ParseRequestURI(params[1])
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Not a valid URL")
 				return
 			}
-			v, err := s.ChannelVoiceJoin(m.GuildID, m.ChannelID, false, false)
-			if err != nil {
-				fmt.Println("Unable to join voice channel:", err)
+
+			requestId := uuid.NewString()
+			if err := os.Mkdir(requestId, os.ModePerm); err != nil {
+				log.Printf("Request ID %s:", err)
 				return
 			}
-			v.Speaking(true)
-			v.Close()
-			v.Disconnect()
 
+			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Preparing to Download Music... RequestID: %s", requestId))
+			if err := downloadMusic(params[1], requestId); err != nil {
+				log.Printf("Request ID %s:", err)
+				s.ChannelMessageSend(m.ChannelID, "Trouble downloading Music")
+				return
+			}
 		}
 	}
 }
 
-func shellCmdFooTest(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
-
-	if m.Content == "$test" {
-		downloadMusic("https://www.youtube.com/watch?v=n8zk0vdvzrc")
-	}
-}
-
-func downloadMusic(ytlink string) {
-	cmd := exec.Command("yt-dlp", "-x", "--audio-format=mp3", ytlink)
+func downloadMusic(ytlink string, requestId string) error {
+	// Notes: https://www.reddit.com/r/youtubedl/comments/rh893t/comment/hopd2b5/?utm_source=share&utm_medium=web2x&context=3
+	dlDirectory := fmt.Sprintf("%s/%s", requestId, "%(title)s.%(ext)s")
+	cmd := exec.Command("yt-dlp", "-x", "--audio-format=mp3", ytlink, "-o", dlDirectory)
 	_, err := cmd.Output()
-	if err != nil {
-		fmt.Println("could not run command: ", err)
-	}
+	return err
 }
