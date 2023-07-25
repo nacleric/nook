@@ -1,4 +1,4 @@
-module mymain
+module nook
 
 go 1.19
 

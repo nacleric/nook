@@ -69,6 +69,6 @@ func TestNotifyEric(t *testing.T) {
 
 	// When
 	// Then
-	notifyEric(dg, "Test NotifyEric() passed")
+	notifyOwner(dg, "Test NotifyEric() passed")
 	dg.Close()
 }
