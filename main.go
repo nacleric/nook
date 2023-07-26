@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -273,6 +274,22 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 
 			// TODO: Upload Music, if multiple songs zip and send
+			files, err := ioutil.ReadDir(requestId)
+			if err != nil {
+				log.Printf("Request ID %s:", err)
+				return
+			}
+
+			fmt.Println(files)
+			// var s []string
+			// for _, file := range files {
+			// 	fmt.Println(file.Name(), file.IsDir())
+			// 	s = append(s, file.Name())
+			// }
+
+			// if len(s) == 1 {
+
+			// }
 		}
 	}
 }
