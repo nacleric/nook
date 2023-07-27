@@ -281,6 +281,16 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 
 			fmt.Println(files)
+			if len(files) == 1 {
+				fileName := files[0].Name()
+				mp3File, err := os.Open(fmt.Sprintf("%s/%s", requestId, fileName))
+				if err != nil {
+					log.Panicln(err)
+				}
+				data := discordgo.MessageSend{Content: "Here you go", File: &discordgo.File{Name: fileName, ContentType: "mp3", Reader: mp3File}}
+				s.ChannelMessageSendComplex(m.ChannelID, &data)
+			}
+
 			// var s []string
 			// for _, file := range files {
 			// 	fmt.Println(file.Name(), file.IsDir())
