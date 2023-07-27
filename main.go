@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -264,21 +265,22 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 			// Note: requestId also acts as a folder
 			requestId := uuid.NewString()
 			if err := os.Mkdir(requestId, os.ModePerm); err != nil {
-				log.Printf("Request ID %s:", err)
+				log.Printf("ReqID %s | err: %s", requestId, err)
 				return
 			}
 
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Preparing to Download Music... RequestID: %s", requestId))
+			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Preparing to Download Music... ReqID: %s", requestId))
 			if err := downloadMusic(params[1], requestId); err != nil {
-				log.Printf("Request ID %s:", err)
+				log.Printf("Trouble downloading Music | ReqID %s | err: %s", requestId, err)
 				s.ChannelMessageSend(m.ChannelID, "Trouble downloading Music")
-				return
+				if err := os.RemoveAll(requestId); err != nil {
+					log.Println(err)
+				}
 			}
 
-			// TODO: Upload Music, if multiple songs zip and send
 			files, err := ioutil.ReadDir(requestId)
 			if err != nil {
-				log.Printf("Request ID %s:", err)
+				log.Printf("Directory might not exist | ReqID %s | err: %s", requestId, err)
 				return
 			}
 
@@ -287,19 +289,65 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 				fileLocation := filepath.Join(requestId, fileName)
 				mp3File, err := os.Open(fileLocation)
 				if err != nil {
-					log.Printf("Request ID %s:", err)
+					log.Printf("mp3File might not exist | ReqID %s | err: %s", requestId, err)
 				}
+				defer mp3File.Close()
+
 				data := discordgo.MessageSend{Content: "Here you go", File: &discordgo.File{Name: fileName, ContentType: "mp3", Reader: mp3File}}
 				s.ChannelMessageSendComplex(m.ChannelID, &data)
+			} else {
+				zipName := fmt.Sprintf("%s.zip", requestId)
+				zipFile, err := os.Create(zipName)
+				if err != nil {
+					log.Printf("Trouble creating zipFile | ReqID %s | err: %s", requestId, err)
+				}
+				defer zipFile.Close()
+
+				zipw := zip.NewWriter(zipFile)
+				defer zipw.Close()
+
+				for _, file := range files {
+					fileLocation := filepath.Join(requestId, file.Name())
+					mp3File, err := os.Open(fileLocation)
+					if err != nil {
+						log.Printf("ReqID %s | err: %s", requestId, err)
+					}
+					defer mp3File.Close()
+
+					wr, err := zipw.Create(file.Name())
+					if err != nil {
+						log.Printf("Failed to create zipWriter | ReqID %s | err: %s", requestId, err)
+					}
+
+					if _, err := io.Copy(wr, mp3File); err != nil {
+						log.Printf("Failed to write %s to zip | ReqID %s | err: %s", file.Name(), requestId, err)
+					}
+				}
+
+				zipData, err := os.Open(zipName)
+				if err != nil {
+					log.Println(err)
+				}
+				data := discordgo.MessageSend{File: &discordgo.File{Name: zipName, ContentType: "application/zip", Reader: zipData}}
+				s.ChannelMessageSendComplex(m.ChannelID, &data)
+
+				// Clean up zipfile
+				if err := os.Remove(zipName); err != nil {
+					log.Println(err)
+				}
 			}
-			os.RemoveAll(requestId) // cleanup
+			// Clean up
+			if err := os.RemoveAll(requestId); err != nil {
+				log.Println(err)
+			}
+			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Task Finished for %s", requestId))
 		}
 	}
 }
 
 func downloadMusic(ytlink string, requestId string) error {
 	// Notes: https://www.reddit.com/r/youtubedl/comments/rh893t/comment/hopd2b5/?utm_source=share&utm_medium=web2x&context=3
-	dlDirectory := fmt.Sprintf("%s/%s", requestId, "%(title)s.%(ext)s")
+	dlDirectory := filepath.Join(requestId, "%(title)s.%(ext)s")
 	cmd := exec.Command("yt-dlp", "-x", "--audio-format=mp3", ytlink, "-o", dlDirectory)
 	_, err := cmd.Output()
 	return err
