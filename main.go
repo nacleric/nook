@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -260,6 +261,7 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 				return
 			}
 
+			// Note: requestId also acts as a folder
 			requestId := uuid.NewString()
 			if err := os.Mkdir(requestId, os.ModePerm); err != nil {
 				log.Printf("Request ID %s:", err)
@@ -280,26 +282,17 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 				return
 			}
 
-			fmt.Println(files)
 			if len(files) == 1 {
 				fileName := files[0].Name()
-				mp3File, err := os.Open(fmt.Sprintf("%s/%s", requestId, fileName))
+				fileLocation := filepath.Join(requestId, fileName)
+				mp3File, err := os.Open(fileLocation)
 				if err != nil {
-					log.Panicln(err)
+					log.Printf("Request ID %s:", err)
 				}
 				data := discordgo.MessageSend{Content: "Here you go", File: &discordgo.File{Name: fileName, ContentType: "mp3", Reader: mp3File}}
 				s.ChannelMessageSendComplex(m.ChannelID, &data)
 			}
-
-			// var s []string
-			// for _, file := range files {
-			// 	fmt.Println(file.Name(), file.IsDir())
-			// 	s = append(s, file.Name())
-			// }
-
-			// if len(s) == 1 {
-
-			// }
+			os.RemoveAll(requestId) // cleanup
 		}
 	}
 }
