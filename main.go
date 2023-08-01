@@ -248,100 +248,103 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 	removeExtraWhitespace := regexp.MustCompile(`\s+`).ReplaceAllString(m.Content, " ")
 	params := strings.Split(removeExtraWhitespace, " ")
 
-	if len(params) > 2 {
-		s.ChannelMessageSend(m.ChannelID, "Too many arguments")
+	if params[0] == "$dl" && len(params) == 1 {
+		s.ChannelMessageSend(m.ChannelID, "$dl requires link to youtube video, expecting `$dl <yt link>`")
 		return
 	}
 
-	if len(params) == 2 {
-		if params[0] == "$dl" {
-			// TODO check if it's a valid youtube link
-			_, err := url.ParseRequestURI(params[1])
-			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, "Not a valid URL")
-				return
-			}
+	if params[0] == "$dl" && len(params) > 2 {
+		s.ChannelMessageSend(m.ChannelID, "Too many arguments, expecting `$dl <yt link>`")
+		return
+	}
 
-			// Note: requestId also acts as a folder
-			requestId := uuid.NewString()
-			if err := os.Mkdir(requestId, os.ModePerm); err != nil {
-				log.Printf("ReqID %s | err: %s", requestId, err)
-				return
-			}
+	if params[0] == "$dl" && len(params) == 2 {
+		// TODO check if it's a valid youtube link
+		_, err := url.ParseRequestURI(params[1])
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Not a valid URL")
+			return
+		}
 
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Preparing to Download Music... ReqID: %s", requestId))
-			if err := downloadMusic(params[1], requestId); err != nil {
-				log.Printf("Trouble downloading Music | ReqID %s | err: %s", requestId, err)
-				s.ChannelMessageSend(m.ChannelID, "Trouble downloading Music")
-				if err := os.RemoveAll(requestId); err != nil {
-					log.Println(err)
-				}
-			}
+		// Note: requestId also acts as a folder
+		requestId := uuid.NewString()
+		if err := os.Mkdir(requestId, os.ModePerm); err != nil {
+			log.Printf("ReqID %s | err: %s", requestId, err)
+			return
+		}
 
-			files, err := ioutil.ReadDir(requestId)
-			if err != nil {
-				log.Printf("Directory might not exist | ReqID %s | err: %s", requestId, err)
-				return
-			}
-
-			if len(files) == 1 {
-				fileName := files[0].Name()
-				fileLocation := filepath.Join(requestId, fileName)
-				mp3File, err := os.Open(fileLocation)
-				if err != nil {
-					log.Printf("mp3File might not exist | ReqID %s | err: %s", requestId, err)
-				}
-				defer mp3File.Close()
-
-				data := discordgo.MessageSend{Content: "Here you go", File: &discordgo.File{Name: fileName, ContentType: "mp3", Reader: mp3File}}
-				s.ChannelMessageSendComplex(m.ChannelID, &data)
-			} else {
-				zipName := fmt.Sprintf("%s.zip", requestId)
-				zipFile, err := os.Create(zipName)
-				if err != nil {
-					log.Printf("Trouble creating zipFile | ReqID %s | err: %s", requestId, err)
-				}
-				defer zipFile.Close()
-
-				zipw := zip.NewWriter(zipFile)
-				defer zipw.Close()
-
-				for _, file := range files {
-					fileLocation := filepath.Join(requestId, file.Name())
-					mp3File, err := os.Open(fileLocation)
-					if err != nil {
-						log.Printf("ReqID %s | err: %s", requestId, err)
-					}
-					defer mp3File.Close()
-
-					wr, err := zipw.Create(file.Name())
-					if err != nil {
-						log.Printf("Failed to create zipWriter | ReqID %s | err: %s", requestId, err)
-					}
-
-					if _, err := io.Copy(wr, mp3File); err != nil {
-						log.Printf("Failed to write %s to zip | ReqID %s | err: %s", file.Name(), requestId, err)
-					}
-				}
-
-				zipData, err := os.Open(zipName)
-				if err != nil {
-					log.Println(err)
-				}
-				data := discordgo.MessageSend{File: &discordgo.File{Name: zipName, ContentType: "application/zip", Reader: zipData}}
-				s.ChannelMessageSendComplex(m.ChannelID, &data)
-
-				// Clean up zipfile
-				if err := os.Remove(zipName); err != nil {
-					log.Println(err)
-				}
-			}
-			// Clean up
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Preparing to Download Music... ReqID: %s", requestId))
+		if err := downloadMusic(params[1], requestId); err != nil {
+			log.Printf("Trouble downloading Music | ReqID %s | err: %s", requestId, err)
+			s.ChannelMessageSend(m.ChannelID, "Trouble downloading Music")
 			if err := os.RemoveAll(requestId); err != nil {
 				log.Println(err)
 			}
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Task Finished for %s", requestId))
 		}
+
+		files, err := ioutil.ReadDir(requestId)
+		if err != nil {
+			log.Printf("Directory might not exist | ReqID %s | err: %s", requestId, err)
+			return
+		}
+
+		if len(files) == 1 {
+			fileName := files[0].Name()
+			fileLocation := filepath.Join(requestId, fileName)
+			mp3File, err := os.Open(fileLocation)
+			if err != nil {
+				log.Printf("mp3File might not exist | ReqID %s | err: %s", requestId, err)
+			}
+			defer mp3File.Close()
+
+			data := discordgo.MessageSend{Content: "Here you go", File: &discordgo.File{Name: fileName, ContentType: "mp3", Reader: mp3File}}
+			s.ChannelMessageSendComplex(m.ChannelID, &data)
+		} else {
+			zipName := fmt.Sprintf("%s.zip", requestId)
+			zipFile, err := os.Create(zipName)
+			if err != nil {
+				log.Printf("Trouble creating zipFile | ReqID %s | err: %s", requestId, err)
+			}
+			defer zipFile.Close()
+
+			zipw := zip.NewWriter(zipFile)
+			defer zipw.Close()
+
+			for _, file := range files {
+				fileLocation := filepath.Join(requestId, file.Name())
+				mp3File, err := os.Open(fileLocation)
+				if err != nil {
+					log.Printf("ReqID %s | err: %s", requestId, err)
+				}
+				defer mp3File.Close()
+
+				wr, err := zipw.Create(file.Name())
+				if err != nil {
+					log.Printf("Failed to create zipWriter | ReqID %s | err: %s", requestId, err)
+				}
+
+				if _, err := io.Copy(wr, mp3File); err != nil {
+					log.Printf("Failed to write %s to zip | ReqID %s | err: %s", file.Name(), requestId, err)
+				}
+			}
+
+			zipData, err := os.Open(zipName)
+			if err != nil {
+				log.Println(err)
+			}
+			data := discordgo.MessageSend{File: &discordgo.File{Name: zipName, ContentType: "application/zip", Reader: zipData}}
+			s.ChannelMessageSendComplex(m.ChannelID, &data)
+
+			// Clean up zipfile
+			if err := os.Remove(zipName); err != nil {
+				log.Println(err)
+			}
+		}
+		// Clean up
+		if err := os.RemoveAll(requestId); err != nil {
+			log.Println(err)
+		}
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Task Finished for %s", requestId))
 	}
 }
 
