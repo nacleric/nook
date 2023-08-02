@@ -251,7 +251,7 @@ func whenPartyAnimals(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Content == "$wen" {
 		currentTime := time.Now()
 		partyAnimalsRelease := time.Date(2023, 9, 20, 0, 0, 0, 0, time.UTC)
-		diff := int(math.Ceil(partyAnimalsRelease.Sub(currentTime).Hours() / 24))
+		diff := int(math.Round(partyAnimalsRelease.Sub(currentTime).Hours() / 24))
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%d days till Party Animals", diff))
 	}
 }
