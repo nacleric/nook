@@ -252,7 +252,6 @@ func whenPartyAnimals(s *discordgo.Session, m *discordgo.MessageCreate) {
 		currentTime := time.Now()
 		partyAnimalsRelease := time.Date(2023, 9, 20, 0, 0, 0, 0, time.UTC)
 		diff := int(math.Ceil(partyAnimalsRelease.Sub(currentTime).Hours() / 24))
-		fmt.Println(diff)
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%d days till Party Animals", diff))
 	}
 }
@@ -261,6 +260,7 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
+
 	removeExtraWhitespace := regexp.MustCompile(`\s+`).ReplaceAllString(m.Content, " ")
 	params := strings.Split(removeExtraWhitespace, " ")
 
