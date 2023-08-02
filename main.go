@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -185,6 +186,7 @@ func initBot() *discordgo.Session {
 func initBotCommands(dg *discordgo.Session) {
 	dg.AddHandler(pingMe)
 	dg.AddHandler(youtubeDownloadMp3)
+	dg.AddHandler(whenPartyAnimals)
 }
 
 func discordServerListener(dg *discordgo.Session) {
@@ -238,6 +240,20 @@ func pingMe(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if m.Content == "$ping" {
 		s.ChannelMessageSend(m.ChannelID, "Pong!")
+	}
+}
+
+func whenPartyAnimals(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	if m.Content == "$wen" {
+		currentTime := time.Now()
+		partyAnimalsRelease := time.Date(2023, 9, 20, 0, 0, 0, 0, time.UTC)
+		diff := int(math.Ceil(partyAnimalsRelease.Sub(currentTime).Hours() / 24))
+		fmt.Println(diff)
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("%d days till Party Animals", diff))
 	}
 }
 
