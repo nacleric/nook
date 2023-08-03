@@ -327,9 +327,9 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if err := downloadMusic(params[1], requestId); err != nil {
 			log.Printf("Trouble downloading Music | ReqID %s | err: %s", requestId, err)
 			s.ChannelMessageSend(m.ChannelID, "Trouble downloading Music")
-			if err := os.RemoveAll(requestId); err != nil {
-				log.Println(err)
-			}
+			// if err := os.RemoveAll(requestId); err != nil {
+			// 	log.Println(err)
+			// }
 		}
 
 		files, err := ioutil.ReadDir(requestId)
@@ -415,7 +415,7 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 func downloadMusic(ytlink string, requestId string) error {
 	// Notes: https://www.reddit.com/r/youtubedl/comments/rh893t/comment/hopd2b5/?utm_source=share&utm_medium=web2x&context=3
 	dlDirectory := filepath.Join(requestId, "%(title)s.%(ext)s")
-	cmd := exec.Command("yt-dlp", "-x", "--audio-format=mp3", ytlink, "-o", dlDirectory)
+	cmd := exec.Command("yt-dlp", "--abort-on-unavailable-fragment", "--ignore-errors", "-x", "--audio-format=mp3", ytlink, "-o", dlDirectory)
 	_, err := cmd.Output()
 	return err
 }
