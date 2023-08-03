@@ -20,6 +20,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/gabriel-vasile/mimetype"
+
 	"github.com/google/uuid"
 	"golang.org/x/net/html"
 
@@ -35,6 +41,34 @@ type Item struct {
 	Link  string `json:"link"`
 	Ram   int    `json:"ram"`
 	Misc  string `json:"misc"`
+}
+
+func uploadToS3(zipData *os.File) {
+	accessKey := os.Getenv("VULTR_S3_ACCESS_KEY")
+	secretKey := os.Getenv("VULTR_S3_SECRET_KEY")
+
+	mtype, err := mimetype.DetectFile(zipData.Name())
+	if err != nil {
+		log.Println(err)
+	}
+	s3Vultr := s3.New(session.Must(session.NewSession(&aws.Config{
+		Region:      aws.String("ewr"),
+		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
+		Endpoint:    aws.String("https://ewr1.vultrobjects.com/"),
+	})))
+	_, err = s3Vultr.PutObject(&s3.PutObjectInput{
+		Body:        zipData,
+		Bucket:      aws.String("nook"),
+		Key:         aws.String(zipData.Name()),
+		ACL:         aws.String("public-read"),
+		ContentType: aws.String(mtype.String()),
+	})
+
+	if err != nil {
+		log.Println(err)
+	} else {
+		log.Printf("File %q was Uploaded Successfully.", zipData.Name())
+	}
 }
 
 func readJsonFile() ItemsJson {
@@ -348,8 +382,21 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 			if err != nil {
 				log.Println(err)
 			}
-			data := discordgo.MessageSend{File: &discordgo.File{Name: zipName, ContentType: "application/zip", Reader: zipData}}
-			s.ChannelMessageSendComplex(m.ChannelID, &data)
+			defer zipData.Close()
+
+			zInfo, _ := zipData.Stat()
+			if zInfo.Size() >= 26214400 {
+				uploadToS3(zipData)
+				const (
+					s3UrlPrefix = "https://ewr1.vultrobjects.com"
+					bucketName  = "nook"
+				)
+				s3FileLink := fmt.Sprintf("%s%s%s", s3UrlPrefix, bucketName, zipName)
+				s.ChannelMessageSend(m.ChannelID, s3FileLink)
+			} else {
+				data := discordgo.MessageSend{File: &discordgo.File{Name: zipName, ContentType: "application/zip", Reader: zipData}}
+				s.ChannelMessageSendComplex(m.ChannelID, &data)
+			}
 
 			// Clean up zipfile
 			if err := os.Remove(zipName); err != nil {
