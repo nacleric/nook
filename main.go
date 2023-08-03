@@ -391,7 +391,8 @@ func youtubeDownloadMp3(s *discordgo.Session, m *discordgo.MessageCreate) {
 					s3UrlPrefix = "https://ewr1.vultrobjects.com"
 					bucketName  = "nook"
 				)
-				s3FileLink := fmt.Sprintf("%s%s%s", s3UrlPrefix, bucketName, zipName)
+				s3FileLink := fmt.Sprintf("%s/%s/%s", s3UrlPrefix, bucketName, zipName)
+				fmt.Println(s3FileLink)
 				s.ChannelMessageSend(m.ChannelID, s3FileLink)
 			} else {
 				data := discordgo.MessageSend{File: &discordgo.File{Name: zipName, ContentType: "application/zip", Reader: zipData}}
