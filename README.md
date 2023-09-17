@@ -13,10 +13,12 @@ sudo apt install ffmpeg
 
 
 # Need discord api token
+## https://discord.com/developers/applications/663170522078511104/bot
 export TOKEN=asdasdasd
 
 # S3keys
 export VULTR_S3_SECRET_KEY=asdasdasd
+export VULTR_S3_ACCESS_KEY=asdasdasd
 
 # Used for DM'ing owner of BOT
 export USERID=asdasdasd
